@@ -1,0 +1,16 @@
+export declare function add(a: number, b: number): number;
+export declare function optionalToRequired(value?: string): string;
+export declare function requiredToOptional(value: string): string;
+export declare function removeParam(value: string, legacy: boolean): void;
+export declare function changeParam(value: string): void;
+export declare function changeReturn(): string;
+export declare function overloaded(value: string): string;
+export declare function overloaded(value: number, radix?: number): string;
+export declare function removeOverload(value: string): string;
+export declare function removeOverload(value: number, radix?: number): string;
+export declare function addOverload(value: string): string;
+export declare function optionalParam(value: string): string;
+export declare function removedFromNew(value: string): void;
+export declare function rest(...values: string[]): void;
+export declare function rename(value: string): string;
+export declare function generic<T extends string>(value: T): T;
