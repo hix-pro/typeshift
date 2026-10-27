@@ -404,6 +404,21 @@ directly.
 - **Windows npm sources** need `tar` on `PATH` (included with modern Windows and
   Git Bash).
 
+## Related tools
+
+| Tool | What it does |
+| --- | --- |
+| [EnvAudit](https://github.com/hix-pro/env-audit) | find missing, undocumented, and unused environment variables |
+| [Migration Guard](https://github.com/hix-pro/migration-guard) | statically catch dangerous SQL migrations before they run |
+| [API Watch](https://github.com/hix-pro/api-watch) | catch breaking changes in your OpenAPI and JSON contracts |
+| [RepoRace](https://github.com/hix-pro/reporace) | see which GitHub repositories are accelerating |
+| [ActionLens](https://github.com/hix-pro/action-lens) | see what a GitHub Actions workflow really does, before it hits main |
+| [ComposeMap](https://github.com/hix-pro/compose-map) | understand your Docker Compose stack and its production risks at a glance |
+| [OpenCode Telegram](https://github.com/hix-pro/opencode-telegram) | control a local OpenCode server from Telegram |
+---
+
+_Part of the **[hix tools](https://github.com/hix-pro#readme)** suite — local-first, no backend, CI-ready._
+
 ## License
 
 [MIT](LICENSE) © hix-pro
