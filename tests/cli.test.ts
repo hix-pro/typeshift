@@ -30,7 +30,7 @@ describe("CLI human output and exit codes", () => {
     const result = await runCli(compareArgs("functions"));
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toContain("TypeShift 0.1.0 API compatibility report");
+    expect(result.stdout).toContain(`TypeShift ${PACKAGE_VERSION} API compatibility report`);
     expect(result.stdout).toContain("9 breaking");
     expect(result.stdout).toContain("4 compatible");
     expect(result.stdout).toContain("BREAKING (9)");
@@ -142,7 +142,7 @@ describe("CLI JSON output", () => {
       "semver",
     ]);
     expect(report.schemaVersion).toBe(1);
-    expect(report.tool).toEqual({ name: "typeshift", version: "0.1.0" });
+    expect(report.tool).toEqual({ name: "typeshift", version: PACKAGE_VERSION });
     expect(report.old.source).toBe(fixture("functions", "v1"));
     expect(report.old.files).toEqual(["index.d.ts"]);
     expect(report.new.files).toEqual(["index.d.ts"]);
