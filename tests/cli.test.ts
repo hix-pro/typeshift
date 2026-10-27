@@ -382,6 +382,30 @@ describe("CLI input errors", () => {
     expect(result.stderr).toContain("TS");
   });
 
+  it("reports parse errors in declaration files outside a file source root", async () => {
+    const result = await runCli([
+      "compare",
+      fixture("external", "entry", "entry.d.ts"),
+      fixture("unchanged", "v2"),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Failed to parse declaration files");
+    expect(result.stderr).toMatch(/broken\.d\.ts:\d+:\d+/);
+    expect(result.stderr).toContain("TS");
+  });
+
+  it("reports parse errors in declaration files outside a directory source root", async () => {
+    const result = await runCli([
+      "compare",
+      fixture("external", "pkg"),
+      fixture("unchanged", "v2"),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Failed to parse declaration files");
+    expect(result.stderr).toMatch(/broken\.d\.ts:\d+:\d+/);
+    expect(result.stderr).toContain("TS");
+  });
+
   it("rejects npm sources without an explicit version", async () => {
     const result = await runCli([
       "compare",
@@ -396,6 +420,26 @@ describe("CLI input errors", () => {
     const result = await runCli(["compare", "npm:", fixture("unchanged", "v2")]);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Invalid npm source");
+  });
+
+  it("rejects npm versions with shell metacharacters", async () => {
+    const result = await runCli([
+      "compare",
+      "npm:pkg@1.0.0 & del /q *",
+      fixture("unchanged", "v2"),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Invalid npm version or tag");
+  });
+
+  it("rejects npm package names with shell metacharacters", async () => {
+    const result = await runCli([
+      "compare",
+      "npm:pkg&whoami@1.0.0",
+      fixture("unchanged", "v2"),
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Invalid npm package name");
   });
 });
 

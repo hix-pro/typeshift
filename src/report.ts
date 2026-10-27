@@ -1,5 +1,6 @@
 import pc from "picocolors";
 
+import { inlineCode } from "./markdown";
 import type { Change, ReportData, SemverCheck } from "./types";
 
 export interface HumanReportOptions {
@@ -215,10 +216,6 @@ function colorBump(bump: ReportData["summary"]["recommendedBump"]): string {
   if (bump === "minor") return pc.bold(pc.green(bump));
   if (bump === "patch") return pc.bold(pc.yellow(bump));
   return pc.bold(pc.dim(bump));
-}
-
-function inlineCode(value: string): string {
-  return `\`${value.replace(/`/g, "\\`")}\``;
 }
 
 function escapeTableCell(value: string): string {

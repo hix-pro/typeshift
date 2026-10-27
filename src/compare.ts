@@ -1,3 +1,4 @@
+import { inlineCode } from "./markdown";
 import { recommendBump } from "./semver";
 import type {
   ApiExport,
@@ -460,7 +461,7 @@ function compareMembers(
           changes,
           "member-type-changed",
           path,
-          `Type of property "${path}" changed from ${quoteType(oldType)} to ${quoteType(newType)}; assignability was not proven.`,
+          `Type of property "${path}" changed from ${inlineCode(oldType)} to ${inlineCode(newType)}; assignability was not proven.`,
           oldType,
           newType,
         );
@@ -542,7 +543,7 @@ function compareIndexSignatures(
         changes,
         "index-signature-type-changed",
         path,
-        `Value type of index signature [${key}] changed from ${quoteType(oldSignature.valueType)} to ${quoteType(newSignature.valueType)}; assignability was not proven.`,
+        `Value type of index signature [${key}] changed from ${inlineCode(oldSignature.valueType)} to ${inlineCode(newSignature.valueType)}; assignability was not proven.`,
         oldSignature.valueType,
         newSignature.valueType,
       );
@@ -700,7 +701,7 @@ function compareSignatureDetailed(
         changes,
         "function-parameter-type-changed",
         path,
-        `Parameter "${oldParameter.name}" type changed from ${quoteType(oldParameter.type)} to ${quoteType(newParameter.type)}; assignability was not proven.`,
+        `Parameter "${oldParameter.name}" type changed from ${inlineCode(oldParameter.type)} to ${inlineCode(newParameter.type)}; assignability was not proven.`,
         oldParameter.type,
         newParameter.type,
       );
@@ -732,7 +733,7 @@ function compareSignatureDetailed(
       changes,
       "function-return-type-changed",
       `${signaturePath}.return`,
-      `Return type changed from ${quoteType(oldSignature.returnType || "unknown")} to ${quoteType(newSignature.returnType || "unknown")}; assignability was not proven.`,
+      `Return type changed from ${inlineCode(oldSignature.returnType || "unknown")} to ${inlineCode(newSignature.returnType || "unknown")}; assignability was not proven.`,
       oldSignature.returnType || null,
       newSignature.returnType || null,
     );
@@ -746,7 +747,7 @@ function compareSignatureDetailed(
       changes,
       "function-type-parameters-changed",
       `${signaturePath}.typeParameters`,
-      `Type parameters changed from ${quoteType(formatTypeParameters(oldSignature.typeParameters) || "none")} to ${quoteType(formatTypeParameters(newSignature.typeParameters) || "none")}; assignability was not proven.`,
+      `Type parameters changed from ${inlineCode(formatTypeParameters(oldSignature.typeParameters) || "none")} to ${inlineCode(formatTypeParameters(newSignature.typeParameters) || "none")}; assignability was not proven.`,
       formatTypeParameters(oldSignature.typeParameters) || null,
       formatTypeParameters(newSignature.typeParameters) || null,
     );
@@ -768,7 +769,7 @@ function compareTypeParameters(
     changes,
     rule,
     path,
-    `Type parameters of "${exportName}" changed from ${quoteType(oldText || "none")} to ${quoteType(newText || "none")}; assignability was not proven.`,
+    `Type parameters of "${exportName}" changed from ${inlineCode(oldText || "none")} to ${inlineCode(newText || "none")}; assignability was not proven.`,
     oldText || null,
     newText || null,
   );
@@ -879,7 +880,7 @@ function compareTypeTexts(
     changes,
     "type-changed",
     path,
-    `Type of ${subject} changed from ${quoteType(before)} to ${quoteType(after)}; assignability was not proven.`,
+    `Type of ${subject} changed from ${inlineCode(before)} to ${inlineCode(after)}; assignability was not proven.`,
     oldType,
     newType,
   );
@@ -983,10 +984,6 @@ function memberPath(exportName: string, member: MemberInfo): string {
 function describeMember(member: MemberInfo): string {
   const visibility = member.static ? "static " : "";
   return `${visibility}${member.kind} "${member.name}"`;
-}
-
-function quoteType(type: string): string {
-  return `\`${type.replace(/`/g, "\\`")}\``;
 }
 
 function capitalize(text: string): string {

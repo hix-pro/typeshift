@@ -30,6 +30,20 @@ const SKIPPED_DIRECTORIES = new Set([
 const NPM_VERSION_OR_TAG_RE = /^[A-Za-z0-9][A-Za-z0-9._+~-]*$/;
 const NPM_PACKAGE_NAME_RE =
   /^(?:@[A-Za-z0-9][A-Za-z0-9._~-]*\/)?[A-Za-z0-9][A-Za-z0-9._~-]*$/;
+const NODE_MODULES_DIRECTORY_RE = /[\\/]node_modules[\\/]/;
+
+/**
+ * Directory of the TypeScript installation whose compiler builds the program.
+ * Its default library files (lib.es5.d.ts and friends) live beside the
+ * compiler itself, wherever that installation is rooted.
+ */
+const TYPESCRIPT_LIB_DIRECTORY = (() => {
+  try {
+    return dirname(ts.sys.getExecutingFilePath());
+  } catch {
+    return null;
+  }
+})();
 
 export class SourceError extends Error {
   constructor(message: string) {
@@ -148,14 +162,22 @@ function loadNpmSource(source: string, cwd: string): LoadedSource {
     mkdirSync(packDirectory, { recursive: true });
     mkdirSync(extractDirectory, { recursive: true });
 
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+    const isWindows = process.platform === "win32";
+    const npm = isWindows ? "npm.cmd" : "npm";
+    // Node's CVE-2024-27980 hardening (>=18.20.2/20.12.2) refuses to spawn
+    // .cmd/.bat wrappers without a shell (EINVAL), so Windows has to run
+    // npm.cmd through cmd.exe. That is safe here: parseNpmSpec() restricts
+    // the spec to a charset without spaces or shell metacharacters, and the
+    // pack destination is quoted for the shell because temp paths may
+    // contain spaces.
+    const packDestination = isWindows ? `"${packDirectory}"` : packDirectory;
     const packResult = spawnSync(
       npm,
       [
         "pack",
         spec.spec,
         "--pack-destination",
-        packDirectory,
+        packDestination,
         "--json",
         "--ignore-scripts",
         "--no-audit",
@@ -166,6 +188,7 @@ function loadNpmSource(source: string, cwd: string): LoadedSource {
         encoding: "utf8",
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
+        shell: isWindows,
         env: {
           ...process.env,
           npm_config_loglevel: "error",
@@ -281,16 +304,33 @@ function createLoadedSource(
 
   const program = project.getProgram();
   const rootSet = new Set(rootPaths.map((rootPath) => resolve(rootPath)));
+
+  // The compiler follows imports and re-exports anywhere on disk, so both the
+  // diagnostics scope and the files list are built from reachability rather
+  // than directory containment: the root files plus every declaration file
+  // the program actually reaches. Installed packages (node_modules) and the
+  // TypeScript default libraries are type-resolution inputs, not part of the
+  // analyzed package's surface.
+  const reachableFiles = new Set(rootSet);
+  for (const sourceFile of program.compilerObject.getSourceFiles()) {
+    const filePath = resolve(sourceFile.fileName);
+    if (
+      !isDeclarationFile(filePath) ||
+      reachableFiles.has(filePath) ||
+      isExternalScope(filePath)
+    ) {
+      continue;
+    }
+    reachableFiles.add(filePath);
+  }
+
   const relevantDiagnostics = program
     .getSyntacticDiagnostics()
     .filter((diagnostic) => {
       const sourceFile = diagnostic.getSourceFile();
       if (sourceFile === undefined) return false;
       const filePath = resolve(sourceFile.getFilePath());
-      return (
-        isDeclarationFile(filePath) &&
-        (rootSet.has(filePath) || isWithin(displayRoot, filePath))
-      );
+      return isDeclarationFile(filePath) && reachableFiles.has(filePath);
     });
 
   if (relevantDiagnostics.length > 0) {
@@ -318,18 +358,6 @@ function createLoadedSource(
       );
     }
     roots.push(sourceFile);
-  }
-
-  const reachableFiles = new Set<string>();
-  for (const sourceFile of program.compilerObject.getSourceFiles()) {
-    const filePath = resolve(sourceFile.fileName);
-    if (!isWithin(displayRoot, filePath) || !isDeclarationFile(filePath)) {
-      continue;
-    }
-    reachableFiles.add(filePath);
-  }
-  for (const rootPath of rootPaths) {
-    reachableFiles.add(resolve(rootPath));
   }
 
   const files = [...reachableFiles]
@@ -662,6 +690,20 @@ function isWithin(root: string, candidate: string): boolean {
     (relativePath !== ".." &&
       !relativePath.startsWith(`..${sep}`) &&
       !isAbsolute(relativePath))
+  );
+}
+
+/**
+ * Returns true for declaration files that belong to installed packages (any
+ * `node_modules` directory) or to the TypeScript compiler's own default
+ * libraries. Both are external scope: they feed type resolution but are not
+ * the API surface under comparison.
+ */
+function isExternalScope(filePath: string): boolean {
+  return (
+    NODE_MODULES_DIRECTORY_RE.test(filePath) ||
+    (TYPESCRIPT_LIB_DIRECTORY !== null &&
+      isWithin(TYPESCRIPT_LIB_DIRECTORY, filePath))
   );
 }
 

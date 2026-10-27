@@ -1,6 +1,13 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { compareSurfaces } from "../src/compare";
 import { loadSource } from "../src/load";
+import { buildSurface } from "../src/surface";
+import type { ApiSurface } from "../src/types";
 import {
   compareFixture,
   comparePaths,
@@ -414,5 +421,92 @@ describe("source and no-change behavior", () => {
     expect(rulePaths(result)).toEqual([
       rp("function-parameter-added-optional", "entryPoint(value)"),
     ]);
+  });
+});
+
+describe("declaration files outside the source root", () => {
+  it("lists reachable outside-root declarations and includes their types", () => {
+    const loaded = loadSource(fixturePath("external", "ok", "entry.d.ts"));
+    try {
+      expect(loaded.files).toEqual(["../outside/good.d.ts", "entry.d.ts"]);
+      expect(
+        buildSurface(loaded).exports.map((exported) => exported.name),
+      ).toEqual(["Good", "Local"]);
+    } finally {
+      loaded.cleanup();
+    }
+  });
+
+  it("surfaces parse errors in reachable outside-root declarations", () => {
+    expect(() =>
+      loadSource(fixturePath("external", "entry", "entry.d.ts")),
+    ).toThrow(/broken\.d\.ts:\d+:\d+/);
+    expect(() => loadSource(fixturePath("external", "pkg"))).toThrow(
+      /broken\.d\.ts:\d+:\d+/,
+    );
+  });
+
+  it("keeps node_modules typings out of the files list", () => {
+    // Built in a temporary directory because a tracked fixture directory
+    // named node_modules would be dropped by .gitignore.
+    const root = mkdtempSync(join(tmpdir(), "typeshift-test-"));
+    try {
+      const depDirectory = join(root, "node_modules", "dep");
+      mkdirSync(depDirectory, { recursive: true });
+      writeFileSync(
+        join(root, "entry.d.ts"),
+        'export * from "dep";\n\nexport interface Local {\n  value: number;\n}\n',
+      );
+      writeFileSync(
+        join(depDirectory, "index.d.ts"),
+        "export interface Dep {\n  kind: string;\n}\n",
+      );
+
+      const loaded = loadSource(join(root, "entry.d.ts"));
+      try {
+        expect(loaded.files).toEqual(["entry.d.ts"]);
+        expect(
+          buildSurface(loaded).exports.map((exported) => exported.name),
+        ).toEqual(["Dep", "Local"]);
+      } finally {
+        loaded.cleanup();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("type text quoting in change messages", () => {
+  function typeAliasSurface(typeText: string): ApiSurface {
+    return {
+      exports: [
+        {
+          name: "Mode",
+          kind: "type",
+          signatures: [],
+          callSignatures: [],
+          constructSignatures: [],
+          members: [],
+          indexSignatures: [],
+          heritage: [],
+          enumMembers: null,
+          typeParameters: [],
+          abstract: false,
+          typeText,
+        },
+      ],
+    };
+  }
+
+  it("quotes template-literal types with valid CommonMark code spans", () => {
+    const result = compareSurfaces(
+      typeAliasSurface("`prefix-${string}`"),
+      typeAliasSurface("string"),
+    );
+    const change = result.changes[0];
+    expect(change).toMatchObject({ rule: "type-changed", review: true });
+    expect(change?.message).toContain("`` `prefix-${string}` ``");
+    expect(change?.message).not.toContain("\\`");
   });
 });

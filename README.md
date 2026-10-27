@@ -371,7 +371,7 @@ examples/       the demo package shown in this README
 
 ```sh
 npm ci
-npm test          # builds dist/, then runs 91 Vitest tests
+npm test          # builds dist/, then runs 104 Vitest tests
 npm run typecheck
 npm run build
 npm run check     # tests + typecheck
