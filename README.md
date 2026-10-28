@@ -89,8 +89,8 @@ structurally, and gives you a rule-level explanation for every finding.
   compatible-only changes, and `none` when the API is unchanged.
 - **Version gate** — pass `--from` and `--to` to validate the bump you are about
   to publish, including prerelease and downgrade rules.
-- **Three reports** — readable terminal output, a stable JSON schema, and
-  Markdown for a pull request or release note.
+- **Four reports** — readable terminal output, a stable JSON schema, Markdown
+  for a pull request or release note, and SARIF for code scanning.
 - **Honest uncertainty** — type-text changes are marked **review** instead of
   claiming that TypeScript assignability was proven.
 - **CI-friendly exit codes** — `0` success, `1` usage/source/semver error,
@@ -166,8 +166,9 @@ mutable; pin an exact version in CI for reproducible comparisons.
 
 | Option | Description |
 | --- | --- |
-| `--json` | Write the stable JSON report to stdout. Cannot be combined with `--markdown`. |
+| `--json` | Write the stable JSON report to stdout. Cannot be combined with `--markdown` or `--sarif`. |
 | `--markdown` | Write a Markdown report with summary and change tables. |
+| `--sarif` | Write a SARIF 2.1.0 report for GitHub code scanning. |
 | `--fail-on-breaking` | Exit `2` when at least one breaking change is found. |
 | `--from <version>` | Currently published version; requires `--to`. |
 | `--to <version>` | Intended release version; validated against the recommendation. |
@@ -269,7 +270,8 @@ output can be piped directly into `jq` or saved as an artifact.
       "message": "Export \"LegacyOptions\" was removed.",
       "review": false,
       "before": "interface",
-      "after": null
+      "after": null,
+      "file": "examples/v1/legacy.d.ts"
     }
   ],
   "semver": null
@@ -278,7 +280,50 @@ output can be piped directly into `jq` or saved as an artifact.
 
 Changes are ordered with every breaking change first, then by path, rule, and
 message. The order is deterministic across runs. `semver` is `null` unless both
-`--from` and `--to` are supplied.
+`--from` and `--to` are supplied. `file` is the declaration file that owns the
+changed export, relative to the repository; it is omitted for npm sources
+because their declarations live outside the checkout.
+
+## SARIF output
+
+`--sarif` emits [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) for GitHub code scanning and other SARIF consumers:
+
+```sh
+typeshift compare ./types/v1 ./types/v2 --sarif > typeshift.sarif
+```
+
+Every change rule gets a stable identifier (`typeshift/export-removed`, `typeshift/member-became-required`, and so on). Levels follow the same model as the rest of the tool:
+
+| Change | Level |
+| --- | --- |
+| Breaking | `error` |
+| Breaking, marked for review | `warning` |
+| Compatible | `note` |
+
+Results point at the declaration file that owns the changed export, so pull requests annotate the file that needs attention. The exact line is not tracked; the annotation is file-level. For `npm:` sources there is no repository file, so the artifact location falls back to the package source and the alert is not attached to a line.
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: 20
+  - run: npm ci && npm run build
+  - run: >
+      node dist/cli.js compare npm:your-package@1.4.0 ./dist
+      --from 1.4.0 --to 2.0.0 --fail-on-breaking --sarif > typeshift.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: typeshift.sarif
+      category: typeshift
+```
+
+`--sarif` cannot be combined with `--json` or `--markdown`.
 
 ## Use in CI
 
@@ -316,6 +361,29 @@ Replace the package name and versions. The step exits `2` when a breaking change
 is present and `1` when the planned version is too small. This repository's own
 workflow, including the test matrix, is in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+### Composite action
+
+The repository ships a composite action that builds TypeShift, runs the comparison, uploads SARIF, and preserves the comparison exit code:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - run: npm ci && npm run build
+  - uses: hix-pro/typeshift@main # pin the next release tag once it is published
+    with:
+      old: npm:your-package@1.4.0
+      new: ./dist
+      from: 1.4.0
+      to: 2.0.0
+      fail-on-breaking: true
+```
+
+The action is available from `main` until the next tagged release; pin the tag after it is published. Inputs: `old` and `new` (required), `fail-on-breaking` (default `false`), `from` and `to`, `args` for extra CLI flags, `sarif` (default `true`), and `category` (default `typeshift`). With `sarif: true`, the action writes and uploads a report and then re-exits with the comparison code. The caller needs `security-events: write` for the upload.
 
 ## Examples
 

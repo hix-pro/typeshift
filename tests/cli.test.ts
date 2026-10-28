@@ -166,6 +166,7 @@ describe("CLI JSON output", () => {
       "review",
       "before",
       "after",
+      "file",
     ]);
     expect(report.changes[0]).toEqual({
       severity: "breaking",
@@ -176,6 +177,7 @@ describe("CLI JSON output", () => {
       review: false,
       before: null,
       after: "c: number",
+      file: "tests/fixtures/functions/v2/index.d.ts",
     });
 
     const severities = report.changes.map((change) => change.severity);
@@ -300,7 +302,16 @@ describe("CLI help and usage errors", () => {
     const result = await runCli(compareArgs("unchanged", "--json", "--markdown"));
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
-      "--json and --markdown cannot be used together.",
+      "--json, --markdown, and --sarif cannot be used together.",
+    );
+    expect(result.stdout).toBe("");
+  });
+
+  it("rejects --sarif with --json", async () => {
+    const result = await runCli(compareArgs("unchanged", "--sarif", "--json"));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "--json, --markdown, and --sarif cannot be used together.",
     );
     expect(result.stdout).toBe("");
   });
@@ -485,5 +496,90 @@ describe("bundled examples", () => {
     expect(result.status).toBe(2);
     expect(result.stdout).toContain("9 breaking");
     expect(result.stdout).toContain("Recommended bump: major");
+  });
+});
+
+describe("CLI SARIF output", () => {
+  it("emits SARIF 2.1.0 with rules, levels, and declaration files", async () => {
+    const result = await runCli(
+      compareArgs("functions", "--sarif", "--fail-on-breaking"),
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toBe("");
+
+    const sarif = JSON.parse(result.stdout) as {
+      version: string;
+      runs: Array<{
+        tool: {
+          driver: {
+            name: string;
+            version: string;
+            rules: Array<{ id: string; shortDescription: { text: string } }>;
+          };
+        };
+        results: Array<{
+          ruleId: string;
+          level: string;
+          message: { text: string };
+          locations: Array<{
+            physicalLocation: {
+              artifactLocation: { uri: string };
+              region?: { startLine: number };
+            };
+            logicalLocations: Array<{ fullyQualifiedName: string }>;
+          }>;
+        }>;
+      }>;
+    };
+
+    expect(sarif.version).toBe("2.1.0");
+    const driver = sarif.runs[0]?.tool.driver;
+    expect(driver?.name).toBe("TypeShift");
+    expect(driver?.version).toBe(PACKAGE_VERSION);
+    expect(driver?.rules.length).toBeGreaterThan(30);
+    expect(
+      driver?.rules.find((rule) => rule.id === "typeshift/export-removed")
+        ?.shortDescription.text,
+    ).toBe("Export removed");
+
+    const results = sarif.runs[0]?.results ?? [];
+    expect(results).toHaveLength(13);
+
+    const addedParameter = results.find(
+      (item) => item.ruleId === "typeshift/function-parameter-added-required",
+    );
+    expect(addedParameter?.level).toBe("error");
+    expect(
+      addedParameter?.locations[0]?.physicalLocation.artifactLocation.uri,
+    ).toBe("tests/fixtures/functions/v2/index.d.ts");
+    expect(
+      addedParameter?.locations[0]?.physicalLocation.region?.startLine,
+    ).toBe(1);
+    expect(
+      addedParameter?.locations[0]?.logicalLocations[0]?.fullyQualifiedName,
+    ).toBe("add(c)");
+    expect(addedParameter?.message.text).toContain(
+      'Parameter "c" was added and is required.',
+    );
+
+    const removedExport = results.find(
+      (item) => item.ruleId === "typeshift/export-removed",
+    );
+    expect(
+      removedExport?.locations[0]?.physicalLocation.artifactLocation.uri,
+    ).toBe("tests/fixtures/functions/v1/index.d.ts");
+
+    expect(results.some((item) => item.level === "warning")).toBe(true);
+    expect(results.some((item) => item.level === "note")).toBe(true);
+  });
+
+  it("emits an empty result set for an unchanged API", async () => {
+    const result = await runCli(compareArgs("unchanged", "--sarif"));
+    expect(result.status).toBe(0);
+
+    const sarif = JSON.parse(result.stdout) as {
+      runs: Array<{ results: unknown[] }>;
+    };
+    expect(sarif.runs[0]?.results).toEqual([]);
   });
 });

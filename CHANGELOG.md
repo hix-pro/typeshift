@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `--sarif` emits SARIF 2.1.0 for GitHub code scanning. Every change rule has a stable `typeshift/*` identifier, breaking changes map to `error`, review changes to `warning`, and compatible changes to `note`.
+- Changes now carry the declaration file that owns the exported API, exposed as `file` in the JSON report when the file is inside the repository. SARIF uses it for pull request annotations.
+- Composite GitHub Action that builds TypeShift, compares two API surfaces, uploads SARIF by default, and preserves the comparison exit code.
+
 ## [0.1.1] - 2026-10-28
 
 ### Added

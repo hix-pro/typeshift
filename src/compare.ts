@@ -70,6 +70,20 @@ export function compareSurfaces(
     compareExport(oldExport, newExport, changes);
   }
 
+  const oldFiles = new Map(
+    oldSurface.exports.map((exported) => [exported.name, exported.file]),
+  );
+  const newFiles = new Map(
+    newSurface.exports.map((exported) => [exported.name, exported.file]),
+  );
+  for (const change of changes) {
+    const root = exportRootName(change.path);
+    const file = newFiles.get(root) ?? oldFiles.get(root);
+    if (file !== null && file !== undefined) {
+      change.file = file;
+    }
+  }
+
   changes.sort(compareChanges);
 
   const breaking = changes.filter(
@@ -988,6 +1002,10 @@ function describeMember(member: MemberInfo): string {
 
 function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
+}
+
+function exportRootName(path: string): string {
+  return /^[^.\s(]+/.exec(path)?.[0] ?? path;
 }
 
 function compareChanges(a: Change, b: Change): number {

@@ -1,0 +1,24 @@
+name: Dogfood
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  compare:
+    name: TypeShift compares the example API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Uses the action.yml in this repository. The example pair contains
+      # breaking changes, so this exercises report-only mode and SARIF output.
+      - uses: ./
+        with:
+          old: examples/v1
+          new: examples/v2

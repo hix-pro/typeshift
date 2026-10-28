@@ -1,0 +1,113 @@
+name: TypeShift
+description: >-
+  Compare TypeScript declaration APIs and fail when a release needs a major
+  version bump. Uploads SARIF for code scanning by default.
+branding:
+  icon: git-pull-request
+  color: orange
+
+inputs:
+  old:
+    description: Old declaration file, directory, or npm:pkg@version source.
+    required: true
+  new:
+    description: New declaration file, directory, or npm:pkg@version source.
+    required: true
+  fail-on-breaking:
+    description: Exit 2 when breaking changes are found.
+    required: false
+    default: 'false'
+  from:
+    description: Currently published version, used with `to` to validate the bump.
+    required: false
+    default: ''
+  to:
+    description: Release version, used with `from` to validate the bump.
+    required: false
+    default: ''
+  args:
+    description: Extra arguments passed through to `typeshift compare`.
+    required: false
+    default: ''
+  sarif:
+    description: >-
+      Write and upload a SARIF report for GitHub code scanning. Requires
+      `security-events: write` in the caller workflow.
+    required: false
+    default: 'true'
+  category:
+    description: Category used to separate SARIF results from multiple runs.
+    required: false
+    default: typeshift
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: '20'
+
+    - name: Build TypeShift
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        npm ci --no-audit --no-fund
+        npm run build
+
+    - name: Run TypeShift
+      id: compare
+      shell: bash
+      continue-on-error: true
+      env:
+        TS_OLD: ${{ inputs.old }}
+        TS_NEW: ${{ inputs.new }}
+        TS_FAIL_ON_BREAKING: ${{ inputs.fail-on-breaking }}
+        TS_FROM: ${{ inputs.from }}
+        TS_TO: ${{ inputs.to }}
+        TS_ARGS: ${{ inputs.args }}
+        TS_SARIF: ${{ inputs.sarif }}
+        TS_SARIF_FILE: ${{ runner.temp }}/typeshift.sarif
+      run: |
+        args=()
+        if [[ "$TS_FAIL_ON_BREAKING" == "true" ]]; then
+          args+=(--fail-on-breaking)
+        fi
+        if [[ -n "$TS_FROM" ]]; then
+          args+=(--from "$TS_FROM")
+        fi
+        if [[ -n "$TS_TO" ]]; then
+          args+=(--to "$TS_TO")
+        fi
+
+        set +e
+        if [[ "$TS_SARIF" == "true" ]]; then
+          # TS_ARGS is deliberately word-split so callers can pass several flags.
+          # shellcheck disable=SC2086
+          node "$GITHUB_ACTION_PATH/dist/cli.js" compare \
+            "$TS_OLD" "$TS_NEW" "${args[@]}" --sarif $TS_ARGS > "$TS_SARIF_FILE"
+        else
+          # shellcheck disable=SC2086
+          node "$GITHUB_ACTION_PATH/dist/cli.js" compare \
+            "$TS_OLD" "$TS_NEW" "${args[@]}" $TS_ARGS
+        fi
+        code=$?
+        set -e
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"
+
+    - name: Upload SARIF
+      if: ${{ always() && inputs.sarif == 'true' }}
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ runner.temp }}/typeshift.sarif
+        category: ${{ inputs.category }}
+        wait-for-processing: false
+
+    - name: Preserve comparison result
+      if: ${{ steps.compare.outputs.exit_code != '0' }}
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.compare.outputs.exit_code }}
+      run: exit "$EXIT_CODE"

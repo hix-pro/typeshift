@@ -81,6 +81,8 @@ export interface EnumMemberInfo {
 export interface ApiExport {
   name: string;
   kind: ApiExportKind;
+  /** Absolute path of the primary declaration, or null when unavailable. */
+  file?: string | null;
   /** Function signatures, or callable type alias signatures. */
   signatures: SignatureInfo[];
   callSignatures: SignatureInfo[];
@@ -254,6 +256,8 @@ export interface Change {
   review: boolean;
   before: string | null;
   after: string | null;
+  /** Declaration file that owns the changed export, relative to the repository. */
+  file?: string;
 }
 
 export type RecommendedBump = "major" | "minor" | "patch" | "none";

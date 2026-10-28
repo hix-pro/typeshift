@@ -93,6 +93,7 @@ function buildExport(name: string, declarations: Node[]): ApiExport {
   const primary = pickPrimaryDeclaration(sortedDeclarations);
   const kind = primary ? kindOfNode(primary) : "unknown";
   const base = emptyExport(name, kind);
+  base.file = primary?.getSourceFile().getFilePath() ?? null;
 
   if (kind === "function") {
     const functions = sortedDeclarations.filter(Node.isFunctionDeclaration);
@@ -665,6 +666,7 @@ function emptyExport(name: string, kind: ApiExportKind): ApiExport {
   return {
     name,
     kind,
+    file: null,
     signatures: [],
     callSignatures: [],
     constructSignatures: [],

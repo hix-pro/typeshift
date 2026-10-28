@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 import { Command } from "commander";
 
@@ -15,6 +15,7 @@ import {
   formatJson,
   formatMarkdown,
 } from "./report";
+import { formatSarif } from "./sarif";
 import { checkSemverBump, classifyBump, VersionError } from "./semver";
 import { buildSurface } from "./surface";
 import type { ReportData } from "./types";
@@ -29,6 +30,7 @@ class UsageError extends Error {
 interface CompareOptions {
   json?: boolean;
   markdown?: boolean;
+  sarif?: boolean;
   failOnBreaking?: boolean;
   from?: string;
   to?: string;
@@ -60,6 +62,7 @@ export function buildProgram(): Command {
     )
     .option("--json", "print a stable JSON report")
     .option("--markdown", "print a Markdown report for a PR or release note")
+    .option("--sarif", "print a SARIF 2.1.0 report for GitHub code scanning")
     .option(
       "--fail-on-breaking",
       "exit with code 2 when breaking changes are found",
@@ -104,8 +107,12 @@ function runCompare(
   newSource: string,
   options: CompareOptions,
 ): void {
-  if (options.json === true && options.markdown === true) {
-    throw new UsageError("--json and --markdown cannot be used together.");
+  if (
+    [options.json, options.markdown, options.sarif].filter(Boolean).length > 1
+  ) {
+    throw new UsageError(
+      "--json, --markdown, and --sarif cannot be used together.",
+    );
   }
 
   const hasFrom = options.from !== undefined;
@@ -158,7 +165,7 @@ function runCompare(
         files: newLoaded.files,
       },
       summary: comparison.summary,
-      changes: comparison.changes,
+      changes: comparison.changes.map(repoRelativeChange),
       semver,
     };
 
@@ -167,9 +174,11 @@ function runCompare(
         ? formatJson(report)
         : options.markdown === true
           ? formatMarkdown(report)
-          : formatHuman(report, {
-              failOnBreaking: options.failOnBreaking === true,
-            });
+          : options.sarif === true
+            ? formatSarif(report)
+            : formatHuman(report, {
+                failOnBreaking: options.failOnBreaking === true,
+              });
     process.stdout.write(output);
 
     if (semver !== null && !semver.ok) {
@@ -212,6 +221,25 @@ export function main(argv = process.argv): void {
     );
     process.exitCode = 1;
   }
+}
+
+function repoRelativeChange(
+  change: ReportData["changes"][number],
+): ReportData["changes"][number] {
+  if (change.file === undefined) return change;
+
+  const file = relative(process.cwd(), change.file);
+  if (
+    file === "" ||
+    file === ".." ||
+    file.startsWith(`..${sep}`) ||
+    isAbsolute(file)
+  ) {
+    const copy = { ...change };
+    delete copy.file;
+    return copy;
+  }
+  return { ...change, file: file.split(sep).join("/") };
 }
 
 function readPackageVersion(): string {
