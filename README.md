@@ -372,9 +372,9 @@ permissions:
   security-events: write
 
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   - run: npm ci && npm run build
-  - uses: hix-pro/typeshift@main # pin the next release tag once it is published
+  - uses: hix-pro/typeshift@v0.1.1
     with:
       old: npm:your-package@1.4.0
       new: ./dist
@@ -383,7 +383,7 @@ steps:
       fail-on-breaking: true
 ```
 
-The action is available from `main` until the next tagged release; pin the tag after it is published. Inputs: `old` and `new` (required), `fail-on-breaking` (default `false`), `from` and `to`, `args` for extra CLI flags, `sarif` (default `true`), and `category` (default `typeshift`). With `sarif: true`, the action writes and uploads a report and then re-exits with the comparison code. The caller needs `security-events: write` for the upload.
+The action is published with `v0.1.1`; pin a tag for reproducible runs. Inputs: `old` and `new` (required), `fail-on-breaking` (default `false`), `from` and `to`, `args` for extra CLI flags, `sarif` (default `true`), and `category` (default `typeshift`). With `sarif: true`, the action writes and uploads a report and then re-exits with the comparison code. The caller needs `security-events: write` for the upload.
 
 ## Examples
 
