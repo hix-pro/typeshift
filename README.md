@@ -316,7 +316,7 @@ steps:
   - run: >
       node dist/cli.js compare npm:your-package@1.4.0 ./dist
       --from 1.4.0 --to 2.0.0 --fail-on-breaking --sarif > typeshift.sarif
-  - uses: github/codeql-action/upload-sarif@v3
+  - uses: github/codeql-action/upload-sarif@v4
     if: always()
     with:
       sarif_file: typeshift.sarif
