@@ -10,24 +10,86 @@ permissions:
 
 jobs:
   npm:
+    name: Package and publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org/
+          cache: npm
+
+      - name: Use current npm
+        run: npm install --global npm@latest
+
       - name: Install dependencies
         run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Test, typecheck, and build
+        run: npm run check
+
+      - name: Pack the npm tarball
+        id: pack
+        shell: bash
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN not set - running dry-run instead of publishing."
-            npm publish --dry-run
+          tarball=$(npm pack --silent)
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "Packed $tarball"
+
+      - name: Attach the tarball to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pack.outputs.tarball }}" --clobber
+
+      - name: Check the npm publish gate
+        id: gate
+        env:
+          NPM_PUBLISH: ${{ vars.NPM_PUBLISH }}
+        shell: bash
+        run: |
+          if [ "$NPM_PUBLISH" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "NPM_PUBLISH is enabled." >> "$GITHUB_STEP_SUMMARY"
           else
-            npm publish
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "NPM_PUBLISH is not 'true'; the package will not be published." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Publish to npm
+        if: steps.gate.outputs.enabled == 'true'
+        run: npm publish --provenance --access public
+
+      - name: Verify the published version
+        if: steps.gate.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          for attempt in 1 2 3 4 5; do
+            if npm view "typeshift@$version" version >/dev/null 2>&1; then
+              echo "typeshift@$version is live."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "typeshift@$version was not visible after publish." >&2
+          exit 1
+
+      - name: Dry-run the npm publish
+        if: steps.gate.outputs.enabled != 'true'
+        shell: bash
+        run: |
+          npm publish --dry-run --access public
+          {
+            echo ""
+            echo "### npm publish skipped"
+            echo ""
+            echo "Set the repository variable \`NPM_PUBLISH\` to \`true\` after npm trusted publishing is configured."
+          } >> "$GITHUB_STEP_SUMMARY"

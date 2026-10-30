@@ -1,6 +1,6 @@
 {
   "name": "typeshift",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A local-first TypeScript API compatibility checker that tells you whether declaration changes actually require a semver major release.",
   "keywords": [
     "typescript",
@@ -23,6 +23,9 @@
   "author": "hix-pro",
   "bin": {
     "typeshift": "dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
