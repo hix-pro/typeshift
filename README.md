@@ -98,7 +98,7 @@ structurally, and gives you a rule-level explanation for every finding.
 
 ## Install
 
-TypeShift is not published to the npm registry. Build it from source:
+TypeShift is not yet published to the npm registry. Build it from source, or install the tarball attached to a release:
 
 ```sh
 git clone https://github.com/hix-pro/typeshift.git
@@ -106,6 +106,12 @@ cd typeshift
 npm ci
 npm run build
 npm link          # optional: makes `typeshift` available on PATH
+```
+
+Release tarballs are also attached to each GitHub release:
+
+```sh
+npm install -g ./typeshift-0.2.0.tgz
 ```
 
 Without `npm link`:
@@ -308,8 +314,8 @@ permissions:
   security-events: write
 
 steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-node@v4
+  - uses: actions/checkout@v7
+  - uses: actions/setup-node@v7
     with:
       node-version: 20
   - run: npm ci && npm run build
@@ -340,8 +346,8 @@ jobs:
   compare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -374,7 +380,7 @@ permissions:
 steps:
   - uses: actions/checkout@v7
   - run: npm ci && npm run build
-  - uses: hix-pro/typeshift@v0.1.1
+  - uses: hix-pro/typeshift@v0.2.0
     with:
       old: npm:your-package@1.4.0
       new: ./dist
@@ -383,7 +389,7 @@ steps:
       fail-on-breaking: true
 ```
 
-The action is published with `v0.1.1`; pin a tag for reproducible runs. Inputs: `old` and `new` (required), `fail-on-breaking` (default `false`), `from` and `to`, `args` for extra CLI flags, `sarif` (default `true`), and `category` (default `typeshift`). With `sarif: true`, the action writes and uploads a report and then re-exits with the comparison code. The caller needs `security-events: write` for the upload.
+The action is published with `v0.2.0`; pin a tag for reproducible runs. Inputs: `old` and `new` (required), `fail-on-breaking` (default `false`), `from` and `to`, `args` for extra CLI flags, `sarif` (default `true`), and `category` (default `typeshift`). With `sarif: true`, the action writes and uploads a report and then re-exits with the comparison code. The caller needs `security-events: write` for the upload.
 
 ## Examples
 
@@ -439,7 +445,7 @@ examples/       the demo package shown in this README
 
 ```sh
 npm ci
-npm test          # builds dist/, then runs 104 Vitest tests
+npm test          # builds dist/, then runs 110 Vitest tests
 npm run typecheck
 npm run build
 npm run check     # tests + typecheck

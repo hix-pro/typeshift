@@ -5,12 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-30
 
 ### Added
 - `--sarif` emits SARIF 2.1.0 for GitHub code scanning. Every change rule has a stable `typeshift/*` identifier, breaking changes map to `error`, review changes to `warning`, and compatible changes to `note`.
 - Changes now carry the declaration file that owns the exported API, exposed as `file` in the JSON report when the file is inside the repository. SARIF uses it for pull request annotations.
 - Composite GitHub Action that builds TypeShift, compares two API surfaces, uploads SARIF by default, and preserves the comparison exit code.
+- npm release packaging: `npm pack` produces a small tarball with built JavaScript, the CLI shebang, README, license, and notices. The Publish workflow attaches the tarball to the GitHub release and can publish through npm trusted publishing when the repository variable `NPM_PUBLISH` is `true`.
+- `publishConfig` makes the package public when the npm release is enabled.
+
+### Changed
+- The action example and release documentation now pin `v0.2.0`, the first tag that contains `action.yml` and SARIF support. The previous pin pointed at a tag without the action.
 
 ## [0.1.1] - 2026-10-28
 
